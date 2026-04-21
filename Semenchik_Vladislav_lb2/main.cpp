@@ -54,12 +54,14 @@ int main() {
                               << ", новая стоимость=" << newCost << endl;
                 
                 if (newCost < dp[newMask][v]) {
-                    dp[newMask][v] = newCost;
-                    parent[newMask][v] = u;
 
                     if (LOG) cout << "Обновляем: dp[" << newMask << "][" << v 
                                   << "]. было " << dp[newMask][v] 
                                   << ", стало " << newCost << endl;
+                    dp[newMask][v] = newCost;
+                    parent[newMask][v] = u;
+
+                    
                     dp[newMask][v] = newCost;
                     parent[newMask][v] = u;
                 } else if (LOG) {
