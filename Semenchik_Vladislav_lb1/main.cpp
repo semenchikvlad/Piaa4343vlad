@@ -5,6 +5,8 @@
 #include <chrono>
 #include <cmath>
 
+#define LOG false
+
 using namespace std;
 
 struct Square {
@@ -89,6 +91,20 @@ public:
         }
         return count;
     }
+    
+    void print_board_state() {
+        if (!LOG) return;
+        for (int i = 0; i < N; i++) {
+            for (int j = 0; j < N; j++) {
+                if (rows[i] & (1ULL << j)) {
+                    cout << "# ";
+                } else {
+                    cout << ". ";
+                }
+            }
+            cout << "\n";
+        }
+    }
 };
 
 void print_solution(vector<Square> solution, int N) {
@@ -101,49 +117,81 @@ void print_solution(vector<Square> solution, int N) {
 uint64_t Board::bit_prefixes[30];
 
 int smallest_divisor(int N) {
+    if (LOG) cout << "Поиск наименьшего делителя для " << N << endl;
     for (int div = 3; div * div <= N; div++) {
-        if (N % div == 0) return div;
+        if (N % div == 0) {
+            if (LOG) cout << "Найден делитель: " << div << endl;
+            return div;
+        }
     }
+    if (LOG) cout << "Делителей не найдено" << endl;
     return N;
 }
 
 void find_solution(int N, vector<Square> &solution) {
+    if (LOG) cout << "\nПоиск решения для квадрата " << N << "x" << N << endl;
+    
     stack<Board> st;
     Board board(N);
     
     solution.clear();
     solution.push_back({0, 0, N - 1});
-
     for (int i = 0; i < N; i++) solution.push_back({N - 1, i, 1});
     for (int i = 0; i < N - 1; i++) solution.push_back({i, N - 1, 1});
-
+    
+    if (LOG) cout << "Начальное эвристическое решение: " << solution.size() << " квадратов" << endl;
+    
     int best_side = N / 2 + 1;
+    if (LOG) cout << "Начальное размещение: квадрат " << best_side << " в углу" << endl;
+    
     board.place_square(0, 0, best_side);
     board.place_square(0, best_side, N - best_side);
     board.place_square(best_side, 0, N - best_side);
     st.push(board);
     
+    if (LOG) {
+        cout << "Начальное состояние доски:\n";
+        board.print_board_state();
+    }
+
+    int steps = 0;
+    
     while(!st.empty()) {
+        steps += 1;
         Board current = st.top();
         st.pop();
         
         int x, y;
         if (!current.first_empty(x, y)) {
-            if (current.placed_squares.size() < solution.size()) 
+            if (LOG) cout << "Найдено полное решение из " << current.placed_squares.size() << " квадратов" << endl;
+            if (current.placed_squares.size() < solution.size()) {
+                if (LOG) cout << "Улучшение: " << solution.size() << " -> " << current.placed_squares.size() << endl;
                 solution = current.placed_squares;
+                if (LOG) current.print_board_state();
+            }
             continue;
         }
         
-        if (current.placed_squares.size() >= solution.size())  continue;
+        if (current.placed_squares.size() >= solution.size()) continue;
         
         int max_size = min({N - x, N - y});
-        if (current.placed_squares.size() + current.empty_cells_count() / (max_size * max_size) >= solution.size()) continue;
+        int empty_cells = current.empty_cells_count();
+        int min_additional = empty_cells / (max_size * max_size);
         
+        if (current.placed_squares.size() + min_additional >= solution.size()) continue;
         
         while (max_size > 0 && !current.can_place(x, y, max_size)) max_size--;
         
+        if (LOG) {
+            cout << "Позиция (" << x << "," << y << "), макс. размер=" << max_size 
+                 << ", уже квадратов=" << current.placed_squares.size() << endl;
+        }
+        
         for(int size = max_size; size > 0; size--) {
             if (current.can_place(x, y, size)) {
+                if (LOG) {
+                    cout << "  Размещаем квадрат " << size << " в (" << x << "," << y << ")" << endl;
+                }
                 current.place_square(x, y, size);
                 st.push(current);
                 current.placed_squares.pop_back();
@@ -151,14 +199,21 @@ void find_solution(int N, vector<Square> &solution) {
             }   
         }
     }
+    cout << steps << "steps\n";
+    
+    if (LOG) cout << "Поиск завершен." << endl;
 }
+
 int main() {
     int N;
     cin >> N;
-    auto start = std::chrono::high_resolution_clock::now();
-
+    
     vector<Square> solution;
+    
+    if (LOG) cout << "Размер квадрата: " << N << endl;
+    
     if (N % 2 == 0) {
+        if (LOG) cout << "N четное, делим на 4 квадрата" << endl;
         int half = N / 2;
         solution.clear();
         solution.push_back({0, 0, half});
@@ -166,25 +221,31 @@ int main() {
         solution.push_back({half, 0, half});
         solution.push_back({half, half, half});
     } else {
+        if (LOG) cout << "N нечетное, ищем разбиение" << endl;
         int d = smallest_divisor(N);
-
-        find_solution(d, solution);
-
+        
+        if (LOG) cout << "Наименьший делитель: " << d << endl;
+        
         if (d != N) {
-            int k = N / d;
+            if (LOG) cout << "Составное N, найдем решение для " << d << "x" << d << endl;
+            vector<Square> base_solution;
+            find_solution(d, base_solution);
             
+            if (LOG) cout << "Масштабируем решение в " << N/d << " раз" << endl;
+            int k = N / d;
+            solution = base_solution;
             for (auto& square : solution) {
                 square.x *= k;
                 square.y *= k;
                 square.size *= k;
             }
+        } else {
+            if (LOG) cout << "Простое N, прямой поиск" << endl;
+            find_solution(N, solution);
         }
     }
     
     print_solution(solution, N);
     
-    auto end = std::chrono::high_resolution_clock::now();
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    //std::cout << ms << " ms\n";
     return 0;
 }
